@@ -11,8 +11,6 @@
       <div class="barcode-section">
         <label>Barcode {{ index + 1 }}:</label>
         <input type="text" v-model="complect.barcode" readonly />
-
-        <!-- Variant 2: Web-based QR scanner -->
         <button @click="openScanner(index)">📷 Browser Scanner</button>
       </div>
 
@@ -24,13 +22,14 @@
 
     <button class="add-btn" @click="addComplect">+ Add More</button>
 
-    <div v-if="scanning" id="reader" class="camera-preview"></div>
+    <div v-if="scanning" class="scanner-overlay">
+      <button class="switch-btn" @click="toggleCamera">🔁 Kamera almashtirish</button>
+      <div id="reader" class="camera-preview"></div>
+    </div>
   </div>
 </template>
 
 <script>
-import jsQR from "jsqr";
-
 export default {
   data() {
     return {
@@ -38,43 +37,18 @@ export default {
       scanning: false,
       scanner: null,
       currentScanIndex: null,
+      cameraFacing: "environment", // or "user"
     };
   },
   methods: {
-    // 📸 Variant 1: Use native camera
-    async onImageSelected(event, index) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (code) {
-          this.complects[index].barcode = code.data;
-        } else {
-          alert("QR kod topilmadi. Iltimos, boshqa rasmni urinib ko‘ring.");
-        }
-      };
-    },
-
-    // 📷 Variant 2: Web scanner (html5-qrcode)
     async openScanner(index) {
       this.currentScanIndex = index;
       this.scanning = true;
 
       this.$nextTick(async () => {
+        const { Html5Qrcode } = await import("html5-qrcode");
+
         if (!this.scanner) {
-          const { Html5Qrcode } = await import("html5-qrcode");
           this.scanner = new Html5Qrcode("reader");
         }
 
@@ -85,14 +59,14 @@ export default {
     startScanner() {
       this.scanner
         .start(
-          { facingMode: "environment" },
+          { facingMode: this.cameraFacing },
           {
-            fps: 15, // yuqoriroq FPS
-            qrbox: { width: 300, height: 300 }, // barcode'lar uchun katta maydon
-            aspectRatio: 1.7778, // 16:9
-            disableFlip: true, // orqa kamera ustuvor
+            fps: 15,
+            qrbox: { width: 300, height: 300 },
+            aspectRatio: 1.7778,
+            disableFlip: true,
             experimentalFeatures: {
-              useBarCodeDetectorIfSupported: true, // autofokus uchun Web API
+              useBarCodeDetectorIfSupported: true,
             },
           },
           (decodedText) => {
@@ -101,9 +75,7 @@ export default {
               this.stopScanner();
             }
           },
-          (errorMessage) => {
-            // Har bir frame'da error bo'lishi mumkin, shunchaki e'tibor bermaymiz
-          }
+          () => {}
         )
         .catch((err) => {
           console.error("Scanner error:", err);
@@ -117,6 +89,20 @@ export default {
           this.currentScanIndex = null;
         });
       }
+    },
+
+    restartScanner() {
+      if (this.scanner) {
+        this.scanner.stop().then(() => {
+          this.startScanner(); // facingMode yangilangan holda qayta ishga tushadi
+        });
+      }
+    },
+
+    toggleCamera() {
+      this.cameraFacing =
+        this.cameraFacing === "environment" ? "user" : "environment";
+      this.restartScanner();
     },
 
     addComplect() {
@@ -159,10 +145,6 @@ input[type="text"] {
   padding: 8px;
   margin-right: 10px;
 }
-.camera-input {
-  display: block;
-  margin-top: 5px;
-}
 button {
   padding: 8px 12px;
   font-size: 14px;
@@ -178,5 +160,17 @@ button {
 }
 .camera-preview {
   margin-top: 20px;
+}
+.scanner-overlay {
+  margin-top: 20px;
+  position: relative;
+  text-align: center;
+}
+.switch-btn {
+  margin-bottom: 10px;
+  background-color: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
 }
 </style>
