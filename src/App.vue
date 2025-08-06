@@ -1,6 +1,6 @@
 <template>
   <div class="scanner-app">
-    <button>Hammasini saqlash</button>
+    <button @click="saveAll">Hammasini saqlash</button>
     <h2 class="title">Barcode Complects</h2>
 
     <div
@@ -22,7 +22,8 @@
 
     <button class="add-btn" @click="addComplect">+ Add More</button>
 
-    <div id="reader" class="camera-preview" v-if="scanning"></div>
+    <!-- Only render scanner box when scanning -->
+    <div v-if="scanning" id="reader" class="camera-preview"></div>
   </div>
 </template>
 
@@ -30,42 +31,66 @@
 export default {
   data() {
     return {
-      inputs: ["", "", ""],
-      currentIndex: 0,
+      complects: [
+        { barcode: "", name: "" }
+      ],
+      scanning: false,
       scanner: null,
+      currentScanIndex: null,
     };
   },
-  async mounted() {
-    if (typeof window !== "undefined") {
-      const { Html5Qrcode } = await import("html5-qrcode");
-      this.scanner = new Html5Qrcode("reader");
-      this.startScanner();
-    }
-  },
   methods: {
-    startScanner() {
-      this.scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          if (this.currentIndex < this.inputs.length) {
-            this.inputs[this.currentIndex] = decodedText;
-            this.currentIndex++;
-          }
-          if (this.currentIndex === this.inputs.length) {
-            this.stopScanner();
-          }
-        },
-        (error) => {}
-      );
+    async openScanner(index) {
+      this.currentScanIndex = index;
+      this.scanning = true;
+
+      this.$nextTick(async () => {
+        // Ensure #reader element is in the DOM
+        if (!this.scanner) {
+          const { Html5Qrcode } = await import("html5-qrcode");
+          this.scanner = new Html5Qrcode("reader");
+        }
+
+        this.startScanner();
+      });
     },
+
+    startScanner() {
+      this.scanner
+        .start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            if (this.currentScanIndex !== null) {
+              this.complects[this.currentScanIndex].barcode = decodedText;
+              this.stopScanner();
+            }
+          },
+          (errorMessage) => {
+            // Handle scan error (optional)
+          }
+        )
+        .catch((err) => {
+          console.error("Error starting scanner:", err);
+        });
+    },
+
     stopScanner() {
       if (this.scanner) {
         this.scanner.stop().then(() => {
-          console.log("Scanner stopped.");
+          this.scanning = false;
+          this.currentScanIndex = null;
         });
       }
     },
+
+    addComplect() {
+      this.complects.push({ barcode: "", name: "" });
+    },
+
+    saveAll() {
+      console.log("Saving complects:", this.complects);
+    }
   },
 };
 </script>
@@ -113,6 +138,6 @@ button {
   border-radius: 4px;
 }
 .camera-preview {
-  margin-top: 200px;
+  margin-top: 20px;
 }
 </style>
