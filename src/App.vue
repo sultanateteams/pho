@@ -11,7 +11,18 @@
       <div class="barcode-section">
         <label>Barcode {{ index + 1 }}:</label>
         <input type="text" v-model="complect.barcode" readonly />
-        <button @click="openScanner(index)">📷 Scan</button>
+
+        <!-- Variant 1: Open camera (native camera) -->
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          @change="onImageSelected($event, index)"
+          class="camera-input"
+        />
+
+        <!-- Variant 2: Web-based QR scanner -->
+        <button @click="openScanner(index)">📷 Browser Scanner</button>
       </div>
 
       <div class="name-section">
@@ -22,30 +33,55 @@
 
     <button class="add-btn" @click="addComplect">+ Add More</button>
 
-    <!-- Only render scanner box when scanning -->
     <div v-if="scanning" id="reader" class="camera-preview"></div>
   </div>
 </template>
 
 <script>
+import jsQR from "jsqr"; // QR reader from image data
+
 export default {
   data() {
     return {
-      complects: [
-        { barcode: "", name: "" }
-      ],
+      complects: [{ barcode: "", name: "" }],
       scanning: false,
       scanner: null,
       currentScanIndex: null,
     };
   },
   methods: {
+    // 📸 Variant 1: Use native camera
+    async onImageSelected(event, index) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (code) {
+          this.complects[index].barcode = code.data;
+        } else {
+          alert("QR kod topilmadi. Iltimos, boshqa rasmni urinib ko‘ring.");
+        }
+      };
+    },
+
+    // 📷 Variant 2: Web scanner (html5-qrcode)
     async openScanner(index) {
       this.currentScanIndex = index;
       this.scanning = true;
 
       this.$nextTick(async () => {
-        // Ensure #reader element is in the DOM
         if (!this.scanner) {
           const { Html5Qrcode } = await import("html5-qrcode");
           this.scanner = new Html5Qrcode("reader");
@@ -66,12 +102,10 @@ export default {
               this.stopScanner();
             }
           },
-          (errorMessage) => {
-            // Handle scan error (optional)
-          }
+          () => {}
         )
         .catch((err) => {
-          console.error("Error starting scanner:", err);
+          console.error("Scanner error:", err);
         });
     },
 
@@ -89,8 +123,8 @@ export default {
     },
 
     saveAll() {
-      console.log("Saving complects:", this.complects);
-    }
+      console.log("Saqlanayotgan complectlar:", this.complects);
+    },
   },
 };
 </script>
@@ -123,6 +157,10 @@ input[type="text"] {
   width: calc(100% - 10px);
   padding: 8px;
   margin-right: 10px;
+}
+.camera-input {
+  display: block;
+  margin-top: 5px;
 }
 button {
   padding: 8px 12px;
