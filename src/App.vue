@@ -12,15 +12,6 @@
         <label>Barcode {{ index + 1 }}:</label>
         <input type="text" v-model="complect.barcode" readonly />
 
-        <!-- Variant 1: Open camera (native camera) -->
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          @change="onImageSelected($event, index)"
-          class="camera-input"
-        />
-
         <!-- Variant 2: Web-based QR scanner -->
         <button @click="openScanner(index)">📷 Browser Scanner</button>
       </div>
@@ -38,7 +29,7 @@
 </template>
 
 <script>
-import jsQR from "jsqr"; // QR reader from image data
+import jsQR from "jsqr";
 
 export default {
   data() {
@@ -95,14 +86,24 @@ export default {
       this.scanner
         .start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          {
+            fps: 15, // yuqoriroq FPS
+            qrbox: { width: 300, height: 300 }, // barcode'lar uchun katta maydon
+            aspectRatio: 1.7778, // 16:9
+            disableFlip: true, // orqa kamera ustuvor
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true, // autofokus uchun Web API
+            },
+          },
           (decodedText) => {
             if (this.currentScanIndex !== null) {
               this.complects[this.currentScanIndex].barcode = decodedText;
               this.stopScanner();
             }
           },
-          () => {}
+          (errorMessage) => {
+            // Har bir frame'da error bo'lishi mumkin, shunchaki e'tibor bermaymiz
+          }
         )
         .catch((err) => {
           console.error("Scanner error:", err);
